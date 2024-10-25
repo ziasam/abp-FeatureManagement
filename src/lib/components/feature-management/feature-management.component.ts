@@ -157,7 +157,6 @@ export class FeatureManagementComponent
         if (status === Confirmation.Status.confirm) {
           this.service.delete(this.providerName, this.providerKey).subscribe(() => {
             this.toasterService.success('AbpFeatureManagement::ResetedToDefault');
-            this.visible = false;
 
             if (!this.providerKey) {
               // to refresh host's features
@@ -170,43 +169,44 @@ export class FeatureManagementComponent
 
   onCheckboxClick(val: boolean, feature: FeatureDto) {
     if (val) {
+      this.checkFeatureAndDescendants(feature, true);
       this.checkToggleAncestors(feature);
     } else {
-      this.uncheckToggleDescendants(feature);
+      this.checkFeatureAndDescendants(feature, false);
     }
   }
 
-  private uncheckToggleDescendants(feature: FeatureDto) {
-    this.findAllDescendantsOfByType(feature, ValueTypes.ToggleStringValueType).forEach(node =>
-      this.setFeatureValue(node, false),
+  private checkFeatureAndDescendants(feature: FeatureDto, val: boolean) {
+    this.setFeatureValue(feature, val);
+    this.findAllDescendantsOfByType(feature, ValueTypes.ToggleStringValueType).forEach(descendant =>
+      this.setFeatureValue(descendant, val)
     );
   }
 
   private checkToggleAncestors(feature: FeatureDto) {
-    this.findAllAncestorsOfByType(feature, ValueTypes.ToggleStringValueType).forEach(node =>
-      this.setFeatureValue(node, true),
-    );
-  }
-
-  private findAllAncestorsOfByType(feature: FeatureDto, type: ValueTypes) {
-    let parent = this.findParentByType(feature, type);
-    const ancestors = [];
+    let parent = this.findParentByType(feature, ValueTypes.ToggleStringValueType);
     while (parent) {
-      ancestors.push(parent);
-      parent = this.findParentByType(parent, type);
+      const allSiblingsChecked = this.findChildrenByType(parent, ValueTypes.ToggleStringValueType)
+        .every(child => child.value);
+
+      if (allSiblingsChecked) {
+        this.setFeatureValue(parent, true);
+        parent = this.findParentByType(parent, ValueTypes.ToggleStringValueType);
+      } else {
+        break;
+      }
     }
-    return ancestors;
   }
 
   private findAllDescendantsOfByType(feature: FeatureDto, type: ValueTypes) {
-    const descendants = [];
-    const queue = [feature];
+    const descendants: FeatureDto[] = [];
+    const queue: FeatureDto[] = [feature];
 
     while (queue.length) {
       const node = queue.pop();
-      const newDescendants = this.findChildrenByType(node, type);
-      descendants.push(...newDescendants);
-      queue.push(...newDescendants);
+      const children = this.findChildrenByType(node, type);
+      descendants.push(...children);
+      queue.push(...children);
     }
 
     return descendants;
